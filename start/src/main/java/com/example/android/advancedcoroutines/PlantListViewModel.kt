@@ -18,6 +18,8 @@ package com.example.android.advancedcoroutines
 
 import androidx.lifecycle.*
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -32,8 +34,35 @@ class PlantListViewModel internal constructor(
         // fetch the full plant list
         launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
     }
+    private val growZoneFlow = MutableStateFlow<GrowZone>(NoGrowZone)
 
-    val plantsUsingFlow: LiveData<List<Plant>> = plantRepository.plantsFlow.asLiveData()
+
+    fun setGrowZoneNumber(num: Int) {
+        growZone.value = GrowZone(num)
+        growZoneFlow.value = GrowZone(num)
+
+        launchDataLoad {
+            plantRepository.tryUpdateRecentPlantsForGrowZoneCache(GrowZone(num)) }
+    }
+
+    fun clearGrowZoneNumber() {
+        growZone.value = NoGrowZone
+        growZoneFlow.value = NoGrowZone
+
+        launchDataLoad {
+            plantRepository.tryUpdateRecentPlantsCache()
+        }
+    }
+
+
+
+    val plantsUsingFlow: LiveData<List<Plant>> = growZoneFlow.flatMapLatest { growZone ->
+        if (growZone == NoGrowZone) {
+            plantRepository.plantsFlow
+        } else {
+            plantRepository.getPlantsWithGrowZoneFlow(growZone)
+        }
+    }.asLiveData()
 
     /**
      * Request a snackbar to display a string.
@@ -79,31 +108,7 @@ class PlantListViewModel internal constructor(
         clearGrowZoneNumber()
     }
 
-    /**
-     * Filter the list to this grow zone.
-     *
-     * In the starter code version, this will also start a network request. After refactoring,
-     * updating the grow zone will automatically kickoff a network request.
-     */
-    fun setGrowZoneNumber(num: Int) {
-        growZone.value = GrowZone(num)
 
-        // initial code version, will move during flow rewrite
-        launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
-    }
-
-    /**
-     * Clear the current filter of this plants list.
-     *
-     * In the starter code version, this will also start a network request. After refactoring,
-     * updating the grow zone will automatically kickoff a network request.
-     */
-    fun clearGrowZoneNumber() {
-        growZone.value = NoGrowZone
-
-        // initial code version, will move during flow rewrite
-        launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
-    }
 
     /**
      * Return true iff the current list is filtered.
